@@ -27,6 +27,10 @@ function WHEELDATA.Reset(self)
     self.StatsByFolder = {} -- stats for each folder
     self.TotalStats = {}
 
+    self.AllGroupedSongs = {}
+    self.AllGroupedFilteredSongs = {}
+    self.AllFolderGroups = {}
+
     -- filter info
     self.ActiveFilter = {
         metadata = {    -- search metadata to filter by; filters out all non matches
@@ -480,12 +484,17 @@ end
 
 local groupmodes = {
     [0] = "Group Mode Menu",
-    "Alphabetical"
+    "Pack",
+    "Title",
+    "Author",
+    "Cleartype",
+    "Ungrouped",
+    "BPM",
+    "Top Grade",
+    "Artist",
+    "Length",
+    "Pack Clear Percent",
 }
-
-local function groupToString(val)
-    return groupmodes[val]
-end
 
 local sortmodes = {
     [0] = "Sort Mode Menu",
@@ -517,6 +526,10 @@ local sortmodes = {
 
 local function sortToString(val)
     return sortmodes[val]
+end
+
+local function groupToString(val)
+    return groupmodes[val]
 end
 
 -- getter for if you are in sortmode menu
@@ -763,6 +776,7 @@ end
 local sortmodeImplementations = {
     [0] = { -- The Sort Mode Menu -- all "group" items but pressing enter opens a sort mode
         function()
+            print("sort mode menu")
             WHEELDATA:ResetSorts()
             for _, v in ipairs(sortmodes) do
                 WHEELDATA.AllSongsByFolder[v] = {}
@@ -1701,6 +1715,7 @@ local sortmodeImplementations = {
 local groupmodeImplementations = {
     [0] = { -- The Group Mode Menu -- all "group" items but pressing enter opens a sort mode
         function()
+            print("group mode menu")
             WHEELDATA:ResetSorts()
             for _, v in ipairs(groupmodes) do
                 WHEELDATA.AllSongsByFolder[v] = {}
@@ -1712,6 +1727,26 @@ local groupmodeImplementations = {
         end,
         function(packName)
             return ""
+        end,
+    },
+    {   -- "By Pack" -- The default grouping, songs are grouped by the pack they're contained in.
+        function()
+            print("group by pack")
+            WHEELDATA:ResetSorts()
+            local songs = WHEELDATA:GetAllSongsPassingFilter()
+
+            -- for reasons determined by higher powers, literally mimic the behavior of AllSongsByGroup construction
+            for _, song in ipairs(songs) do
+                local fname = song:GetGroupName()
+                if WHEELDATA.AllGroupedSongs[fname] ~= nil then
+                    WHEELDATA.AllGroupedSongs[fname][#WHEELDATA.AllGroupedSongs[fname] + 1] = song
+                else
+                    WHEELDATA.AllGroupedSongs[fname] = {song}
+                    WHEELDATA.AllFolderGroups[#WHEELDATA.AllFolderGroups + 1] = fname
+                end
+                WHEELDATA.AllGroupedFilteredSongs[#WHEELDATA.AllGroupedFilteredSongs + 1] = song
+            end
+            WHEELDATA:SortByCurrentSortmode()
         end,
     },
 }
@@ -1729,6 +1764,7 @@ end
 -- needs either a string or an index
 -- returns a status of successful sort value change
 function WHEELDATA.SetCurrentSort(self, s)
+    print("setting current sort", s)
     if sortmodes[s] ~= nil then
         self.CurrentSort = s
         return true
@@ -1788,6 +1824,7 @@ function WHEELDATA.SortByCurrentGroupmode(self)
 end
 
 function WHEELDATA.SortByCurrentSortmode(self)
+    print("sorting by current sortmode")
     local sortval, sortstr = self:GetCurrentSort()
     -- if sort is invalid, make sure the output is empty and exit
     if sortval == nil then self:ResetSorts() return end
@@ -2170,8 +2207,15 @@ end
 
 -- sort all songs again basically
 -- requires that AllSongs is set
-function WHEELDATA.UpdateFilteredSonglist(self)
+function WHEELDATA.UpdateFilteredGrouplist(self)
     self:SortByCurrentGroupmode()
+    self:RefreshStats()
+end
+
+-- sort all songs again basically
+-- requires that AllSongs is set
+function WHEELDATA.UpdateFilteredSonglist(self)
+    self:SortByCurrentSortmode()
     self:RefreshStats()
 end
 

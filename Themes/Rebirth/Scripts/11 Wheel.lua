@@ -392,7 +392,8 @@ Wheel.mt = {
 
         -- 0 is the sort mode menu
         WHEELDATA:SetCurrentGroup(0)
-        WHEELDATA:UpdateFilteredSonglist()
+        WHEELDATA:SetCurrentSort(0)
+        WHEELDATA:UpdateFilteredGrouplist()
 
         local newItems = WHEELDATA:GetFilteredFolders()
         WHEELDATA:SetWheelItems(newItems)
@@ -1030,7 +1031,52 @@ function MusicWheel:new(params)
             else
                 local group = songOrPack
 
-                if WHEELDATA:GetCurrentSort() == 0 then
+                if WHEELDATA:GetCurrentGroup() == 0 then
+                    -- IN SORT MODE MENU
+                    -- PICKING SORT
+                    -- group is the name of the sortmode
+                    group = group:gsub("Group by ", "")
+                    
+                    WHEELDATA:SetCurrentGroup(group)
+                    WHEELDATA:UpdateFilteredGrouplist()
+        
+                    local newItems = WHEELDATA:GetFilteredFolders()
+                    WHEELDATA:SetWheelItems(newItems)
+
+                    w:setNewState(
+                        1,
+                        1,
+                        function() return WHEELDATA:GetWheelItems() end,
+                        newItems,
+                        nil
+                    )
+                    crossedGroupBorder = true
+                    forceGroupCheck = true
+                    GAMESTATE:SetCurrentSong(nil)
+                    GAMESTATE:SetCurrentSteps(PLAYER_1, nil)
+                    
+                    MESSAGEMAN:Broadcast("ClosedGroup", {
+                        group = w.group,
+                    })
+                    w:rebuildFrames()
+                    MESSAGEMAN:Broadcast("ModifiedGroups", {
+                        group = w.group,
+                        index = w.index,
+                        maxIndex = #w.items,
+                    })
+                    w:updateGlobalsFromCurrentItem()
+                    w:updateMusicFromCurrentItem()
+                    MESSAGEMAN:Broadcast("WheelSettled", {
+                        song = GAMESTATE:GetCurrentSong(),
+                        group = w.group,
+                        hovered = w:getCurrentItem(),
+                        steps = GAMESTATE:GetCurrentSteps(),
+                        index = w.index,
+                        maxIndex = #w.items,
+                    })
+                    w.settled = true
+                    return
+                elseif WHEELDATA:GetCurrentSort() == 0 then
                     -- IN SORT MODE MENU
                     -- PICKING SORT
                     -- group is the name of the sortmode
