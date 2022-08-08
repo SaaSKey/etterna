@@ -482,46 +482,61 @@ function WHEELDATA.ResetSorts(self)
     self.TotalStats = {}
 end
 
+-- quickly empty previous group/sorts
+function WHEELDATA.ResetGroups(self)
+    self.AllFolderGroups = {}
+    self.AllGroupedSongs = {}
+    self.AllGroupedFilteredSongs = {}
+end
+
+-- applies grouped/sorted folders to the current list of folders
+function WHEELDATA.ApplyGroupSortChanges()
+    WHEELDATA.AllFolders = WHEELDATA.AllFolderGroups
+    WHEELDATA.AllSongsByFolder = WHEELDATA.AllGroupedSongs
+    WHEELDATA.AllFilteredSongs = WHEELDATA.AllGroupedFilteredSongs
+end
+
 local groupmodes = {
     [0] = "Group Mode Menu",
     "Pack",
     "Title",
-    "Author",
-    "Cleartype",
-    "Ungrouped",
-    "BPM",
-    "Top Grade",
-    "Artist",
-    "Length",
-    "Pack Clear Percent",
+    -- "Author",
+    -- "Cleartype",
+    -- "Ungrouped",
+    -- "BPM",
+    -- "Top Grade",
+    -- "Artist",
+    -- "Length",
+    -- "Pack Clear Percent",
 }
 
 local sortmodes = {
     [0] = "Sort Mode Menu",
-    "Group", -- group by pack, all "alphabetical order"
-    "Title", -- group by title letter
-    "Author", -- group by chartist
-    "Favorite", -- show only Favorites
-    "Cleartype", -- group by best cleartype on charts
-    "Ungrouped", -- no grouping, alphabetical order
-    "BPM", -- group by bpm ranges
-    "Top Grade", -- group by best grade
-    "Artist", -- group by song artist
-    "Overall MSD", -- group by highest overall MSD
-    "Stream MSD", -- group by highest stream MSD
-    "Jumpstream MSD", -- group by highest jumpstream MSD
-    "Handstream MSD", -- group by highest handstream MSD
-    "Stamina MSD", -- group by highest stamina MSD
-    "Jackspeed MSD", -- group by highest jack MSD
-    "Chordjack MSD", -- group by highest chordjack MSD
-    "Technical MSD", -- group by highest tech MSD
-    "Length", -- group by length range
-    "Pack Clear Percent", -- group by pack, order packs by percentage of grades, then sort by grade; songs ordered by grade
-    "Last Score Date", -- group by month, order packs chronlogically, songs ordered alphabetically
-    "PB Date (Percent)", -- same as above, but picks the highest percent
-    "PB Date (Score Rating)", -- same as above, but picks the highest rating
-    "Tournament", -- same as group alphabetical, but for packs with [x-x] title prefixes, sort by those prefixes
-    "Test", -- tests sort mode
+    "Alphabetical", -- songs are in alphabetical order
+    "Overall MSD", -- sort by overall MSD
+    -- "Group", -- group by pack, all "alphabetical order"
+    -- "Title", -- group by title letter
+    -- "Author", -- group by chartist
+    -- "Favorite", -- show only Favorites
+    -- "Cleartype", -- group by best cleartype on charts
+    -- "Ungrouped", -- no grouping, alphabetical order
+    -- "BPM", -- group by bpm ranges
+    -- "Top Grade", -- group by best grade
+    -- "Artist", -- group by song artist
+    -- "Overall MSD", -- group by highest overall MSD
+    -- "Stream MSD", -- group by highest stream MSD
+    -- "Jumpstream MSD", -- group by highest jumpstream MSD
+    -- "Handstream MSD", -- group by highest handstream MSD
+    -- "Stamina MSD", -- group by highest stamina MSD
+    -- "Jackspeed MSD", -- group by highest jack MSD
+    -- "Chordjack MSD", -- group by highest chordjack MSD
+    -- "Technical MSD", -- group by highest tech MSD
+    -- "Length", -- group by length range
+    -- "Pack Clear Percent", -- group by pack, order packs by percentage of grades, then sort by grade; songs ordered by grade
+    -- "Last Score Date", -- group by month, order packs chronlogically, songs ordered alphabetically
+    -- "PB Date (Percent)", -- same as above, but picks the highest percent
+    -- "PB Date (Score Rating)", -- same as above, but picks the highest rating
+    -- "Tournament", -- same as group alphabetical, but for packs with [x-x] title prefixes, sort by those prefixes
 }
 
 local function sortToString(val)
@@ -791,30 +806,20 @@ local sortmodeImplementations = {
         end,
     },
 
-    {   -- "Group" sort -- by pack, alphabetical within
+    {   -- "Alphabetical" sort -- songs are ordered alphabetically
         function()
             WHEELDATA:ResetSorts()
             local songs = WHEELDATA:GetAllSongsPassingFilter()
 
-            -- for reasons determined by higher powers, literally mimic the behavior of AllSongsByGroup construction
-            for _, song in ipairs(songs) do
-                local fname = song:GetGroupName()
-                if WHEELDATA.AllSongsByFolder[fname] ~= nil then
-                    WHEELDATA.AllSongsByFolder[fname][#WHEELDATA.AllSongsByFolder[fname] + 1] = song
-                else
-                    WHEELDATA.AllSongsByFolder[fname] = {song}
-                    WHEELDATA.AllFolders[#WHEELDATA.AllFolders + 1] = fname
-                end
-                WHEELDATA.AllFilteredSongs[#WHEELDATA.AllFilteredSongs + 1] = song
-            end
             -- sort the groups and then songlists in groups
-            table.sort(WHEELDATA.AllFolders, function(a,b) return a:lower() < b:lower() end)
-            for _, songlist in pairs(WHEELDATA.AllSongsByFolder) do
+            table.sort(WHEELDATA.AllFolderGroups, function(a,b) return a:lower() < b:lower() end)
+            for _, songlist in pairs(WHEELDATA.AllGroupedSongs) do
                 table.sort(
                     songlist,
                     SongUtil.SongTitleComparator
                 )
             end
+            WHEELDATA:ApplyGroupSortChanges()
         end,
         function(song)
             return song:GetGroupName()
@@ -823,6 +828,31 @@ local sortmodeImplementations = {
             return SONGMAN:GetSongGroupBannerPath(packName)
         end,
     },
+
+    {   -- Overall MSD sort -- folders sorted internally by overall MSD
+    function()
+        WHEELDATA:ResetSorts()
+        local songs = WHEELDATA:GetAllSongsPassingFilter()
+
+        -- sort folders and songs
+        table.sort(WHEELDATA.AllFolderGroups, function(a,b) return a:lower() < b:lower() end)
+        for _, songlist in pairs(WHEELDATA.AllGroupedSongs) do
+            table.sort(
+                songlist,
+                function(a,b)
+                    return getHighestDiffForSongBySkillset(a, 1) < getHighestDiffForSongBySkillset(b, 1)
+                end
+            )
+        end
+        WHEELDATA:ApplyGroupSortChanges()
+    end,
+    function(song)
+        return song:GetGroupName()
+    end,
+    function(packName)
+        return SONGMAN:GetSongGroupBannerPath(packName)
+    end,
+},
 
     {   -- "Title" sort -- by song title, alphabetical within
         function()
@@ -1716,6 +1746,7 @@ local groupmodeImplementations = {
     [0] = { -- The Group Mode Menu -- all "group" items but pressing enter opens a sort mode
         function()
             print("group mode menu")
+            WHEELDATA:ResetGroups()
             WHEELDATA:ResetSorts()
             for _, v in ipairs(groupmodes) do
                 WHEELDATA.AllSongsByFolder[v] = {}
@@ -1729,9 +1760,10 @@ local groupmodeImplementations = {
             return ""
         end,
     },
-    {   -- "By Pack" -- The default grouping, songs are grouped by the pack they're contained in.
+    {   -- "Pack" -- The default grouping, songs are grouped by the pack they're contained in.
         function()
             print("group by pack")
+            WHEELDATA:ResetGroups()
             WHEELDATA:ResetSorts()
             local songs = WHEELDATA:GetAllSongsPassingFilter()
 
@@ -1749,6 +1781,25 @@ local groupmodeImplementations = {
             WHEELDATA:SortByCurrentSortmode()
         end,
     },
+    {   -- "Title" -- Songs are grouped by the first letter of their name.
+        function()
+            WHEELDATA:ResetGroups()
+            WHEELDATA:ResetSorts()
+            local songs = WHEELDATA:GetAllSongsPassingFilter()
+
+            for _, song in ipairs(songs) do
+                local fname = getTitleSortFoldernameForSong(song)
+                if WHEELDATA.AllGroupedSongs[fname] ~= nil then
+                    WHEELDATA.AllGroupedSongs[fname][#WHEELDATA.AllGroupedSongs[fname] + 1] = song
+                else
+                    WHEELDATA.AllGroupedSongs[fname] = {song}
+                    WHEELDATA.AllFolderGroups[#WHEELDATA.AllFolderGroups + 1] = fname
+                end
+                WHEELDATA.AllGroupedFilteredSongs[#WHEELDATA.AllGroupedFilteredSongs + 1] = song
+            end
+            WHEELDATA:SortByCurrentSortmode()
+        end,
+    }
 }
 
 -- get the value and string value of the current sort
