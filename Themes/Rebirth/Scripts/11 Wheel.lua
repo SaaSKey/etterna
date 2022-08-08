@@ -386,6 +386,50 @@ Wheel.mt = {
             maxIndex = #whee.items,
         })
     end,
+    openGroupModeMenu = function(w)
+        -- if transitioning into a song dont let the wheel do anything
+        if enteringSong then return end
+
+        -- 0 is the sort mode menu
+        WHEELDATA:SetCurrentGroup(0)
+        WHEELDATA:UpdateFilteredSonglist()
+
+        local newItems = WHEELDATA:GetFilteredFolders()
+        WHEELDATA:SetWheelItems(newItems)
+
+        w:setNewState(
+            1,
+            1,
+            function() return WHEELDATA:GetWheelItems() end,
+            newItems,
+            nil
+        )
+        crossedGroupBorder = true
+        forceGroupCheck = true
+        GAMESTATE:SetCurrentSong(nil)
+        GAMESTATE:SetCurrentSteps(PLAYER_1, nil)
+
+        MESSAGEMAN:Broadcast("ClosedGroup", {
+            group = w.group
+        })
+        w:rebuildFrames()
+        MESSAGEMAN:Broadcast("ModifiedGroups", {
+            group = w.group,
+            index = w.index,
+            maxIndex = #w.items,
+        })
+        w:updateGlobalsFromCurrentItem()
+        w:updateMusicFromCurrentItem()
+        MESSAGEMAN:Broadcast("WheelSettled", {
+            song = GAMESTATE:GetCurrentSong(),
+            group = w.group,
+            hovered = w:getCurrentItem(),
+            steps = GAMESTATE:GetCurrentSteps(),
+            index = w.index, maxIndex = #w.items,
+        })
+        w.settled = true
+    end,
+
     openSortModeMenu = function(w)
         -- if transitioning into a song dont let the wheel do anything
         if enteringSong then return end
@@ -723,7 +767,7 @@ function Wheel:new(params)
                     local function d(b) return b == "Down" or b == "MenuDown" end
                     if u(buttonQueue[1]) and d(buttonQueue[2]) and u(buttonQueue[3]) and d(buttonQueue[4]) then
                         -- open sort mode menu
-                        whee:openSortModeMenu()
+                        whee:openGroupModeMenu()
                         buttonQueue = {}
                         return true
                     end
