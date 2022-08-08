@@ -811,8 +811,6 @@ local sortmodeImplementations = {
             WHEELDATA:ResetSorts()
             local songs = WHEELDATA:GetAllSongsPassingFilter()
 
-            -- sort the groups and then songlists in groups
-            table.sort(WHEELDATA.AllFolderGroups, function(a,b) return a:lower() < b:lower() end)
             for _, songlist in pairs(WHEELDATA.AllGroupedSongs) do
                 table.sort(
                     songlist,
@@ -834,8 +832,6 @@ local sortmodeImplementations = {
         WHEELDATA:ResetSorts()
         local songs = WHEELDATA:GetAllSongsPassingFilter()
 
-        -- sort folders and songs
-        table.sort(WHEELDATA.AllFolderGroups, function(a,b) return a:lower() < b:lower() end)
         for _, songlist in pairs(WHEELDATA.AllGroupedSongs) do
             table.sort(
                 songlist,
@@ -1703,6 +1699,10 @@ local groupmodeImplementations = {
                 end
                 WHEELDATA.AllGroupedFilteredSongs[#WHEELDATA.AllGroupedFilteredSongs + 1] = song
             end
+            
+            -- Sort folders alphabetically
+            table.sort(WHEELDATA.AllFolderGroups, function(a,b) return a:lower() < b:lower() end)
+            -- Call menu to sort files within folders
             WHEELDATA:SortByCurrentSortmode()
         end,
     },
@@ -1722,6 +1722,9 @@ local groupmodeImplementations = {
                 end
                 WHEELDATA.AllGroupedFilteredSongs[#WHEELDATA.AllGroupedFilteredSongs + 1] = song
             end
+            -- Sort folders alphabetically
+            table.sort(WHEELDATA.AllFolderGroups, function(a,b) return a:lower() < b:lower() end)
+            -- Call menu to sort files within folders
             WHEELDATA:SortByCurrentSortmode()
         end,
     },
@@ -1742,10 +1745,13 @@ local groupmodeImplementations = {
                 end
                 WHEELDATA.AllGroupedFilteredSongs[#WHEELDATA.AllGroupedFilteredSongs + 1] = song
             end
+            -- Sort folders alphabetically
+            table.sort(WHEELDATA.AllFolderGroups, function(a,b) return a:lower() < b:lower() end)
+            -- Call menu to sort files within folders
             WHEELDATA:SortByCurrentSortmode()
         end,
     },
-    {   -- Cleartype 
+    {   -- "Cleartype" -- Songs are grouped by cleartype (SDCB, Clear, Failed, etc.).
         function()
             WHEELDATA:ResetGroups()
             WHEELDATA:ResetSorts()
@@ -1762,17 +1768,105 @@ local groupmodeImplementations = {
                 end
                 WHEELDATA.AllGroupedFilteredSongs[#WHEELDATA.AllGroupedFilteredSongs + 1] = song
             end
+
+            -- sort groups by cleartype value instead of alphabetically
+            table.sort(WHEELDATA.AllFolderGroups,
+                function(a,b)
+                    local aa = getClearTypeIndexFromValue(a)
+                    local bb = getClearTypeIndexFromValue(b)
+                    return aa < bb
+                end
+            )
+            -- Call menu to sort files within folders
             WHEELDATA:SortByCurrentSortmode()
         end
     },
-    {   -- Ungrouped
-        
-    },
-    {   -- BPM
+    {   -- "Ungrouped" -- Songs are all in one folder named "Ungrouped"
+        function()
+            WHEELDATA:ResetGroups()
+            WHEELDATA:ResetSorts()
+            local songs = WHEELDATA:GetAllSongsPassingFilter()
+            local fname = "Ungrouped"
 
+            -- build the song list in the group
+            for _, song in ipairs(songs) do
+                if WHEELDATA.AllGroupedSongs[fname] ~= nil then
+                    WHEELDATA.AllGroupedSongs[fname][#WHEELDATA.AllGroupedSongs[fname] + 1] = song
+                else
+                    WHEELDATA.AllGroupedSongs[fname] = {song}
+                    WHEELDATA.AllFolderGroups[#WHEELDATA.AllFolderGroups + 1] = fname
+                end
+                WHEELDATA.AllGroupedFilteredSongs[#WHEELDATA.AllGroupedFilteredSongs + 1] = song
+            end
+            -- Call menu to sort files within folders
+            WHEELDATA:SortByCurrentSortmode()
+        end
+    },
+    {   -- "BPM" -- Songs are grouped by BPM range
+        function()
+            WHEELDATA:ResetGroups()
+            WHEELDATA:ResetSorts()
+            local songs = WHEELDATA:GetAllSongsPassingFilter()
+
+            for _, song in ipairs(songs) do
+                local fname = getBPMSortFoldernameForSong(song)
+                if WHEELDATA.AllGroupedSongs[fname] ~= nil then
+                    WHEELDATA.AllGroupedSongs[fname][#WHEELDATA.AllGroupedSongs[fname] + 1] = song
+                else
+                    WHEELDATA.AllGroupedSongs[fname] = {song}
+                    WHEELDATA.AllFolderGroups[#WHEELDATA.AllFolderGroups + 1] = fname
+                end
+                WHEELDATA.AllGroupedFilteredSongs[#WHEELDATA.AllGroupedFilteredSongs + 1] = song
+            end
+            -- Sort by BPM number
+            table.sort(
+                WHEELDATA.AllFolderGroups,
+                function(a,b)
+                    local af = a:gsub("-", "")
+                    local bf = b:gsub("-", "")
+                    return tonumber(af) < tonumber(bf)
+                end
+            )
+            -- Call menu to sort files within folders
+            WHEELDATA:SortByCurrentSortmode()
+        end
     },
     {   -- Top Grade
+        function()
+            WHEELDATA:ResetGroups()
+            WHEELDATA:ResetSorts()
+            local songs = WHEELDATA:GetAllSongsPassingFilter()
 
+            -- dynamically track what the localized grades mean
+            -- to fix things for the sort function
+            local gradezz = {}
+
+            -- go through AllSongs and construct it as we go, then sort
+            for _, song in ipairs(songs) do
+                local fname, originalgrade = getTopGradeSortFoldernameForSong(song)
+                gradezz[fname] = originalgrade
+
+                if WHEELDATA.AllGroupedSongs[fname] ~= nil then
+                    WHEELDATA.AllGroupedSongs[fname][#WHEELDATA.AllGroupedSongs[fname] + 1] = song
+                else
+                    WHEELDATA.AllGroupedSongs[fname] = {song}
+                    WHEELDATA.AllFolderGroups[#WHEELDATA.AllFolderGroups + 1] = fname
+                end
+                WHEELDATA.AllGroupedFilteredSongs[#WHEELDATA.AllGroupedFilteredSongs + 1] = song
+            end
+
+            -- sort folder by grade
+            table.sort(
+                WHEELDATA.AllFolderGroups,
+                function(a,b)
+                    if not gradezz[a] then return false end
+                    if not gradezz[b] then return true end
+                    return compareGrades(gradezz[a], gradezz[b])
+                end
+            )
+            -- Call menu to sort files within folders
+            WHEELDATA:SortByCurrentSortmode()
+        end
     }
 
 }
