@@ -498,14 +498,14 @@ end
 
 local groupmodes = {
     [0] = "Group Mode Menu",
-    "Pack",
-    "Title",
-    -- "Author",
-    -- "Cleartype",
-    -- "Ungrouped",
-    -- "BPM",
-    -- "Top Grade",
-    -- "Artist",
+    "Pack", -- group by pack, default 
+    "Title", -- group by title letter 
+    "Author", -- group by step author 
+    "Cleartype", -- group by best cleartype on charts 
+    "Ungrouped", -- all songs in one folder 
+    "BPM", -- group by bpm ranges
+    "Top Grade", -- group by best grade
+    "Artist", -- group by song artist
     -- "Length",
     -- "Pack Clear Percent",
 }
@@ -852,81 +852,6 @@ local sortmodeImplementations = {
     function(packName)
         return SONGMAN:GetSongGroupBannerPath(packName)
     end,
-},
-
-    {   -- "Title" sort -- by song title, alphabetical within
-        function()
-            WHEELDATA:ResetSorts()
-            local songs = WHEELDATA:GetAllSongsPassingFilter()
-
-            -- go through AllSongs and construct it as we go, then sort
-            for _, song in ipairs(songs) do
-                local fname = getTitleSortFoldernameForSong(song)
-                if WHEELDATA.AllSongsByFolder[fname] ~= nil then
-                    WHEELDATA.AllSongsByFolder[fname][#WHEELDATA.AllSongsByFolder[fname] + 1] = song
-                else
-                    WHEELDATA.AllSongsByFolder[fname] = {song}
-                    WHEELDATA.AllFolders[#WHEELDATA.AllFolders + 1] = fname
-                end
-                WHEELDATA.AllFilteredSongs[#WHEELDATA.AllFilteredSongs + 1] = song
-            end
-            -- sort groups and then songlists in groups
-            table.sort(WHEELDATA.AllFolders, function(a,b) return a:lower() < b:lower() end)
-            for _, songlist in pairs(WHEELDATA.AllSongsByFolder) do
-                table.sort(
-                    songlist,
-                    SongUtil.SongTitleComparator
-                )
-            end
-        end,
-        function(song)
-            return getTitleSortFoldernameForSong(song)
-        end,
-        function(packName)
-            return ""
-        end,
-    },
-
-    {   -- "Author" sort -- by chart artist(s), alphabetical within
-        function()
-            WHEELDATA:ResetSorts()
-            local songs = WHEELDATA:GetAllSongsPassingFilter()
-
-            -- go through AllSongs and construct it as we go, then sort
-            for _, song in ipairs(songs) do
-                local fname = getAuthorSortFoldernameForSong(song)
-                if WHEELDATA.AllSongsByFolder[fname] ~= nil then
-                    WHEELDATA.AllSongsByFolder[fname][#WHEELDATA.AllSongsByFolder[fname] + 1] = song
-                else
-                    WHEELDATA.AllSongsByFolder[fname] = {song}
-                    WHEELDATA.AllFolders[#WHEELDATA.AllFolders + 1] = fname
-                end
-                WHEELDATA.AllFilteredSongs[#WHEELDATA.AllFilteredSongs + 1] = song
-            end
-            -- sort groups and then songlists in groups
-            table.sort(WHEELDATA.AllFolders, function(a,b) return a:lower() < b:lower() end)
-            for _, songlist in pairs(WHEELDATA.AllSongsByFolder) do
-                table.sort(
-                    songlist,
-                    SongUtil.SongTitleComparator
-                )
-            end
-        end,
-        function(song)
-            return getAuthorSortFoldernameForSong(song)
-        end,
-        function(packName)
-            -- take the given folder and pull the cdtitle of the first song
-            -- we don't cache this value so looping until we find a valid image isn't a good idea
-            local s = WHEELDATA.AllSongsByFolder[packName]
-            if s ~= nil then
-                local p = s[1]:GetCDTitlePath()
-                if p ~= nil then
-                    return p
-                end
-            end
-            return ""
-        end,
     },
 
     {   -- Favorite sort -- alphabetical order, all favorited charts, 1 folder
@@ -1799,7 +1724,57 @@ local groupmodeImplementations = {
             end
             WHEELDATA:SortByCurrentSortmode()
         end,
+    },
+    {   -- "Author" -- Songs are grouped by step author.
+        function()
+            WHEELDATA:ResetGroups()
+            WHEELDATA:ResetSorts()
+            local songs = WHEELDATA:GetAllSongsPassingFilter()
+
+            -- go through AllSongs and construct it as we go, then sort
+            for _, song in ipairs(songs) do
+                local fname = getAuthorSortFoldernameForSong(song)
+                if WHEELDATA.AllGroupedSongs[fname] ~= nil then
+                    WHEELDATA.AllGroupedSongs[fname][#WHEELDATA.AllGroupedSongs[fname] + 1] = song
+                else
+                    WHEELDATA.AllGroupedSongs[fname] = {song}
+                    WHEELDATA.AllFolderGroups[#WHEELDATA.AllFolderGroups + 1] = fname
+                end
+                WHEELDATA.AllGroupedFilteredSongs[#WHEELDATA.AllGroupedFilteredSongs + 1] = song
+            end
+            WHEELDATA:SortByCurrentSortmode()
+        end,
+    },
+    {   -- Cleartype 
+        function()
+            WHEELDATA:ResetGroups()
+            WHEELDATA:ResetSorts()
+            local songs = WHEELDATA:GetAllSongsPassingFilter()
+
+            -- go through AllSongs and construct it as we go, then sort
+            for _, song in ipairs(songs) do
+                local fname = getBestCleartypeForSong(song)
+                if WHEELDATA.AllGroupedSongs[fname] ~= nil then
+                    WHEELDATA.AllGroupedSongs[fname][#WHEELDATA.AllGroupedSongs[fname] + 1] = song
+                else
+                    WHEELDATA.AllGroupedSongs[fname] = {song}
+                    WHEELDATA.AllFolderGroups[#WHEELDATA.AllFolderGroups + 1] = fname
+                end
+                WHEELDATA.AllGroupedFilteredSongs[#WHEELDATA.AllGroupedFilteredSongs + 1] = song
+            end
+            WHEELDATA:SortByCurrentSortmode()
+        end
+    },
+    {   -- Ungrouped
+        
+    },
+    {   -- BPM
+
+    },
+    {   -- Top Grade
+
     }
+
 }
 
 -- get the value and string value of the current sort
